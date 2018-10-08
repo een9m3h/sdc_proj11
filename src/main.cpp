@@ -241,14 +241,50 @@ int main() {
 		//last path size
 		int prev_size = previous_path_x.size();
 
-
-          	json msgJson;
-
 		//start in lane 1 - middle lane 0:far left,
   		int lane = 1;
 
   		// have a reference velocity to target
   		double ref_vel = 49.5; //mph
+
+
+		
+		if(prev_size > 0)
+		{
+			car_s = end_path_s;
+		}
+
+		bool too_close = false;
+
+		//find ref_v to use
+		for(int i = 0; i < sensor_fusion.size(); i++)
+		{
+			//only consider cars in same lane
+			float d = sensor_fusion[i][6];
+			if(d < (2+4*lane+2) && d > (2+4*lane-2))
+			{
+				double vx = sensor_fusion[i][3];
+				double vy = sensor_fusion[i][4];
+				double check_speed = sqrt(vx*vx+vy*vy);
+				double check_car_s = sensor_fusion[i][5];
+
+				//preject points out in time as prev points not quite there yet
+				check_car_s += ((double)prev_size*0.02*check_speed); 
+
+				//check s greater than car and s gap
+				if((check_car_s > car_s) && ((check_car_s - car_s) < 30.0))
+				{
+					//could flag to change lanes
+					ref_vel = 29.5; //mph
+					//too_close = true;
+				}
+
+
+
+			}
+		}
+
+          	json msgJson;
 
 		//Create list of widely spaced xy waypoints, evenly spaced at 30m
 		//Later will interpolate these waypoints with a pline and fill it with more points
