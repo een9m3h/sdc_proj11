@@ -164,6 +164,14 @@ vector<double> getXY(double s, double d, const vector<double> &maps_s, const vec
 
 }
 
+//start in lane 1 - middle lane 0:far left,
+int lane = 1;
+
+// have a reference velocity to target
+double ref_vel = 0.0; //mph initialize and then accelerate
+
+
+
 int main() {
   uWS::Hub h;
 
@@ -241,13 +249,7 @@ int main() {
 		//last path size
 		int prev_size = previous_path_x.size();
 
-		//start in lane 1 - middle lane 0:far left,
-  		int lane = 1;
-
-  		// have a reference velocity to target
-  		double ref_vel = 49.5; //mph
-
-
+		
 		
 		if(prev_size > 0)
 		{
@@ -275,13 +277,22 @@ int main() {
 				if((check_car_s > car_s) && ((check_car_s - car_s) < 30.0))
 				{
 					//could flag to change lanes
-					ref_vel = 29.5; //mph
-					//too_close = true;
+					//ref_vel = 29.5; //mph
+					too_close = true;
 				}
 
 
 
 			}
+		}
+
+		if(too_close)
+		{
+			ref_vel -= 0.224; //approx 5m/s^2 deceleratation
+		}
+		else if(ref_vel < 49.5)
+		{
+			ref_vel += 0.224;
 		}
 
           	json msgJson;
