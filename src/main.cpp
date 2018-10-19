@@ -9,6 +9,7 @@
 #include "Eigen-3.3/Eigen/QR"
 #include "json.hpp"
 #include "spline.h"
+#include "vehicle.h"
 
 using namespace std;
 
@@ -17,8 +18,8 @@ using json = nlohmann::json;
 
 // For converting back and forth between radians and degrees.
 constexpr double pi() { return M_PI; }
-double deg2rad(double x) { return x * pi() / 180; }
-double rad2deg(double x) { return x * 180 / pi(); }
+//double deg2rad(double x) { return x * pi() / 180; }
+//double rad2deg(double x) { return x * 180 / pi(); }
 
 // Checks if the SocketIO event has JSON data.
 // If there is data the JSON object in string format will be returned,
@@ -110,7 +111,6 @@ vector<double> getFrenet(double x, double y, double theta, const vector<double> 
 	double proj_y = proj_norm*n_y;
 
 	double frenet_d = distance(x_x,x_y,proj_x,proj_y);
-
 	//see if d value is positive or negative by comparing it to a center point
 
 	double center_x = 1000-maps_x[prev_wp];
@@ -135,7 +135,7 @@ vector<double> getFrenet(double x, double y, double theta, const vector<double> 
 	return {frenet_s,frenet_d};
 
 }
-
+/*
 // Transform from Frenet s,d coordinates to Cartesian x,y
 vector<double> getXY(double s, double d, const vector<double> &maps_s, const vector<double> &maps_x, const vector<double> &maps_y)
 {
@@ -163,6 +163,7 @@ vector<double> getXY(double s, double d, const vector<double> &maps_s, const vec
 	return {x,y};
 
 }
+*/
 
 //start in lane 1 - middle lane 0:far left,
 int lane = 1;
@@ -174,7 +175,11 @@ double ref_vel = 0.0; //mph initialize and then accelerate
 
 int main() {
   uWS::Hub h;
+  
+  //Vehicle ego;
 
+
+  
   // Load up map values for waypoint's x,y,s and d normalized normal vectors
   vector<double> map_waypoints_x;
   vector<double> map_waypoints_y;
@@ -236,6 +241,8 @@ int main() {
           	double car_yaw = j[1]["yaw"];
           	double car_speed = j[1]["speed"];
 
+		Vehicle ego = Vehicle(car_x, car_y, car_s, car_d, car_yaw, car_speed, "KL"); 
+
           	// Previous path data given to the Planner
           	auto previous_path_x = j[1]["previous_path_x"];
           	auto previous_path_y = j[1]["previous_path_y"];
@@ -243,13 +250,15 @@ int main() {
           	double end_path_s = j[1]["end_path_s"];
           	double end_path_d = j[1]["end_path_d"];
 
-          	// Sensor Fusion Data, a list of all other cars on the same side of the road.
-          	auto sensor_fusion = j[1]["sensor_fusion"];
+		ego.add_prev_path(previous_path_x, previous_path_y, end_path_d, end_path_s);
 
-		//last path size
+          	//last path size
 		int prev_size = previous_path_x.size();
 
-		
+		// Sensor Fusion Data, a list of all other cars on the same side of the road.
+          	auto sensor_fusion = j[1]["sensor_fusion"];
+
+				
 		
 		if(prev_size > 0)
 		{
@@ -258,8 +267,26 @@ int main() {
 
 		bool too_close = false;
 
-		//find ref_v to use
+		map<int, Vehicle> vehicles;
+
 		for(int i = 0; i < sensor_fusion.size(); i++)
+		{
+			double x 	= sensor_fusion[i][1];
+			double y 	= sensor_fusion[i][2];
+			double vx 	= sensor_fusion[i][3];
+			double vy 	= sensor_fusion[i][4];
+			double s 	= sensor_fusion[i][5];
+			double d 	= sensor_fusion[i][6];
+		        double yaw 	= Vehicle::calc_yaw(vx, vy);
+			double speed 	= Vehicle::calc_speed(vx, vy);	
+
+			Vehicle vehicle = Vehicle(x,y,s,d, yaw, speed, "KL");
+			vehicles.insert(std::pair<int, Vehicle>(i, vehicle));
+
+		}
+
+		//find ref_v to use
+		/*for(int i = 0; i < sensor_fusion.size(); i++)
 		{
 			//only consider cars in same lane
 			float d = sensor_fusion[i][6];
@@ -284,7 +311,7 @@ int main() {
 
 
 			}
-		}
+		}*/
 
 		if(too_close)
 		{
@@ -300,7 +327,7 @@ int main() {
 		//Create list of widely spaced xy waypoints, evenly spaced at 30m
 		//Later will interpolate these waypoints with a pline and fill it with more points
 		
-		vector<double> ptsx;
+	/*	vector<double> ptsx;
 		vector<double> ptsy;
 
 		//reference x,y,yaw states
@@ -338,8 +365,10 @@ int main() {
 			ptsy.push_back(ref_y);
 		}
 
+*/
+
 		//In Fresnet add evenly 30m spaced points ahread of the starting reference
-		vector<double> next_wp0 = getXY(car_s+30, (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+	/*	vector<double> next_wp0 = getXY(car_s+30, (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
 		vector<double> next_wp1 = getXY(car_s+60, (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
 		vector<double> next_wp2 = getXY(car_s+90, (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
 
@@ -404,18 +433,18 @@ int main() {
 
 			x_point += ref_x;
 			y_point += ref_y;
-
 			next_x_vals.push_back(x_point);
 			next_y_vals.push_back(y_point);
 
 		}
+		*/
 
 
-		/*
+		
           	vector<double> next_x_vals;
           	vector<double> next_y_vals;
 
-	        	
+	        /*	
           	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
 		double dist_inc = 0.5;
 	    	for(int i = 0; i < 50; i++)
