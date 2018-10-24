@@ -35,7 +35,7 @@ string hasData(string s) {
   }
   return "";
 }
-
+/*
 double distance(double x1, double y1, double x2, double y2)
 {
 	return sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1));
@@ -134,7 +134,7 @@ vector<double> getFrenet(double x, double y, double theta, const vector<double> 
 
 	return {frenet_s,frenet_d};
 
-}
+}*/
 /*
 // Transform from Frenet s,d coordinates to Cartesian x,y
 vector<double> getXY(double s, double d, const vector<double> &maps_s, const vector<double> &maps_x, const vector<double> &maps_y)
@@ -250,9 +250,12 @@ int main() {
           	double end_path_s = j[1]["end_path_s"];
           	double end_path_d = j[1]["end_path_d"];
 
+		
+          	ego.update_waypoints(map_waypoints_x, map_waypoints_y, map_waypoints_s);			
+		
 		ego.add_prev_path(previous_path_x, previous_path_y, end_path_d, end_path_s);
 
-          	//last path size
+		//last path size
 		int prev_size = previous_path_x.size();
 
 		// Sensor Fusion Data, a list of all other cars on the same side of the road.
@@ -285,6 +288,19 @@ int main() {
 
 		}
 
+		vector<double> next_x_vals;
+          	vector<double> next_y_vals;
+
+
+		ego.choose_next_state(vehicles, next_x_vals, next_y_vals);
+
+		std::cout << "size x/y next in main " << next_x_vals.size() << std::endl;
+
+		for(int i = 0; i < next_x_vals.size(); i++){
+			std::cout << "next_x_vals: " << next_x_vals[i] << " next_y_vals: " << next_y_vals[i] << std::endl;			
+		}
+
+
 		//find ref_v to use
 		/*for(int i = 0; i < sensor_fusion.size(); i++)
 		{
@@ -313,7 +329,7 @@ int main() {
 			}
 		}*/
 
-		if(too_close)
+/*		if(too_close)
 		{
 			ref_vel -= 0.224; //approx 5m/s^2 deceleratation
 		}
@@ -321,7 +337,7 @@ int main() {
 		{
 			ref_vel += 0.224;
 		}
-
+*/
           	json msgJson;
 
 		//Create list of widely spaced xy waypoints, evenly spaced at 30m
@@ -441,9 +457,7 @@ int main() {
 
 
 		
-          	vector<double> next_x_vals;
-          	vector<double> next_y_vals;
-
+          	
 	        /*	
           	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
 		double dist_inc = 0.5;

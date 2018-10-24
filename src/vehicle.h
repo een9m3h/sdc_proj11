@@ -97,29 +97,30 @@ public:
 
   double conv_mph_2_mps(double v);
   
-  vector<Vehicle> choose_next_state(map<int, vector<Vehicle>> predictions);
+  void choose_next_state(map<int, Vehicle> vehicles, vector<double> &next_x_vals, vector<double> &next_y_vals);
 
   vector<string> successor_states();
 
-  vector<Vehicle> generate_trajectory(string state, map<int, vector<Vehicle>> predictions);
+  //vector<Vehicle>
+  void generate_trajectory(string state, map<int, Vehicle> vehicles);
 
-  vector<float> get_kinematics(map<int, vector<Vehicle>> predictions, int lane);
+  vector<float> get_kinematics(map<int, Vehicle> vehicles, int lane);
 
   vector<Vehicle> constant_speed_trajectory();
 
-  vector<Vehicle> keep_lane_trajectory(map<int, vector<Vehicle>> predictions);
+  void keep_lane_trajectory(map<int, Vehicle> vehicles);
 
-  vector<Vehicle> lane_change_trajectory(string state, map<int, vector<Vehicle>> predictions);
+  vector<Vehicle> lane_change_trajectory(string state, map<int, Vehicle> vehicles);
 
-  vector<Vehicle> prep_lane_change_trajectory(string state, map<int, vector<Vehicle>> predictions);
+  vector<Vehicle> prep_lane_change_trajectory(string state, map<int, Vehicle> vehicles);
 
   void increment(int dt);
 
   float position_at(int t);
 
-  bool get_vehicle_behind(map<int, vector<Vehicle>> predictions, int lane, Vehicle & rVehicle);
+  bool get_vehicle_behind(map<int, Vehicle> vehicles, int lane, Vehicle & rVehicle);
 
-  bool get_vehicle_ahead(map<int, vector<Vehicle>> predictions, int lane, Vehicle & rVehicle);
+  bool get_vehicle_ahead(map<int, Vehicle> vehicles, int lane, Vehicle & rVehicle);
 
   vector<Vehicle> generate_predictions(int horizon=2);
 
