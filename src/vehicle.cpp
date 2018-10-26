@@ -9,11 +9,12 @@
 #include "spline.h"
 
 //planning window defines
+#define SAMPLES_PER_SEC 50
 #define SAMPLING_TIME 0.02
-#define PLANNING_LEN  10.0 //secs
+#define PLANNING_LEN  1.0 //secs
 #define METER_PER_MILE 1609.34 
 #define SEC_PER_HOUR 3600
-#define TARGET_SPEED 49.5 // MPH
+#define TARGET_SPEED 45.0 // MPH
 #define IN_RANGE     30.0 // consider cars in this range
 #define MAX_ACC      5.0 // metres/sec^2
 #define TARGET_DIST_CAR_AHEAD 10.0  //meters
@@ -218,6 +219,7 @@ void Vehicle::initialize_trajectory(){
 		ptsx.push_back(this->x);
 		ptsy.push_back(prev_car_y);
 		ptsy.push_back(this->y);
+		this->end_path_v = this->v;
 
 	}
 	//use previous path's endpoint as starting ref
@@ -236,11 +238,16 @@ void Vehicle::initialize_trajectory(){
 		ptsx.push_back(ref_x);
 		ptsy.push_back(ref_y_prev);
 		ptsy.push_back(ref_y);
+		this->end_path_v = conv_mps_2_mph(distance(ref_x, ref_y, ref_x_prev, ref_y_prev)/SAMPLING_TIME);
 	}
 
 	vector<double> sd_points = getFrenet(ptsx.back(), ptsy.back(), ref_yaw, map_waypoints_x, map_waypoints_y);
-	this->end_path_s = sd_points[0];
-	this->end_path_d = sd_points[1];
+	this->end_path_s 	= sd_points[0];
+	this->end_path_d 	= sd_points[1];
+	this->end_path_x 	= ptsx.back();
+	this->end_path_y 	= ptsy.back();
+	this->end_path_yaw 	= ref_yaw;
+
 
 	std::cout << "func end: initialize_trajectory" << std::endl;
 
@@ -294,6 +301,11 @@ double Vehicle::conv_mph_2_mps(double v){
 	 * */
 	return (v*METER_PER_MILE)/SEC_PER_HOUR;
 
+}
+
+double Vehicle::conv_mps_2_mph(double v){
+
+	return (v*SEC_PER_HOUR)/METER_PER_MILE;
 }
 
 void Vehicle::choose_next_state(map<int, Vehicle> vehicles, vector<double> &next_x_vals, vector<double> &next_y_vals) {
@@ -440,6 +452,7 @@ vector<float> Vehicle::get_kinematics(map<int, Vehicle> vehicles, int lane) {
 	    }
 	    else if(speed_delta >= 0.0 && target_dist < 0.0){
 	        //allow steady acceleration upto ahead vehicle whilst increating safety distance
+		std::cout << "allow steady acceleration upto ahead vehicle whilst increating safety distance" << std::endl;
 		new_time_in_acc = abs(2*target_dist)/abs(speed_delta);
 	    	new_accel 	= speed_delta/new_time_in_acc;
 		new_accel 	= new_accel > MAX_ACC ? MAX_ACC : new_accel; //limit accelateration
@@ -449,7 +462,8 @@ vector<float> Vehicle::get_kinematics(map<int, Vehicle> vehicles, int lane) {
 	    }
 	    else if(speed_delta < 0.0 && target_dist < 0.0){
 		//decelerate to hit buffer distance in 1 planning period
-		new_time_in_acc = PLANNING_LEN;
+	        std::cout << "decelerate to hit buffer distance in 1 planning period" << std::endl;
+                new_time_in_acc = PLANNING_LEN;
 		float t1 = ((target_dist*target_dist)*abs(speed_delta))/(new_time_in_acc*2.0 + target_dist*2.0*abs(speed_delta));
 		new_accel = speed_delta/t1;
 		new_velocity = conv_mph_2_mps(this->v) + new_accel*new_time_in_acc;
@@ -470,8 +484,8 @@ vector<float> Vehicle::get_kinematics(map<int, Vehicle> vehicles, int lane) {
 	//maximum acceleration until target speed reached    
 	std::cout << "maximum acceleration until target speed reached" << std::endl;
 	new_velocity 	= TARGET_SPEED; //target speed in MPH
-	new_accel    	= this->v >= TARGET_SPEED ? 0.0: MAX_ACC;  //target acc in m/s^2
-        new_time_in_acc = min(max(conv_mph_2_mps(TARGET_SPEED - this->v)/new_accel, 0.0), PLANNING_LEN); 	
+	new_accel    	= this->end_path_v >= TARGET_SPEED ? 0.0: MAX_ACC;  //target acc in m/s^2
+        new_time_in_acc = min(max(conv_mph_2_mps(TARGET_SPEED - this->end_path_v)/new_accel, 0.0), PLANNING_LEN); 	
     }
 
 
@@ -512,64 +526,6 @@ void Vehicle::keep_lane_trajectory(map<int, Vehicle> vehicles) {
     trajectory.push_back(Vehicle(this->lane, new_s, new_v, new_a, "KL"));
     return trajectory;*/
 
-	vector<float> kinematics = get_kinematics(vehicles, this->lane);
-    	float new_t = kinematics[0];
-    	float new_v = kinematics[1];
-    	float new_a = kinematics[2];
-
-	std::cout << "kinematics: s=" << new_t << ", v=" << new_v << ", a=" << new_a << std::endl;
-
-	//In Fresnet add evenly 30m spaced points ahread of the starting reference
-	vector<double> next_wp0 = getXY(this->end_path_s+30, this->end_path_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
-	vector<double> next_wp1 = getXY(this->end_path_s+60, this->end_path_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
-	vector<double> next_wp2 = getXY(this->end_path_s+90, this->end_path_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
-
-	std::cout << "Added 30/60/90 points" << std::endl; 
-
-	ptsx.push_back(next_wp0[0]);	
-	ptsx.push_back(next_wp1[0]);
-	ptsx.push_back(next_wp2[0]);
-
-	ptsy.push_back(next_wp0[1]);	
-	ptsy.push_back(next_wp1[1]);
-	ptsy.push_back(next_wp2[1]);
-
-
-	for(int i = 0; i < ptsx.size(); i++)
-	{
-		std::cout << "bf x: " << ptsx[i] << "   bf y: " << ptsy[i] << std::endl;
-	}
-
-	for(int i = 0; i < ptsx.size(); i++)
-	{
-		//shift car ref angle to 0 deg
-		double shift_x = ptsx[i]-this->x;
-		double shift_y = ptsy[i]-this->y;
-
-		ptsx[i] = (shift_x*cos(0-this->yaw)-shift_y*sin(0-this->yaw));
-		ptsy[i] = (shift_x*sin(0-this->yaw)+shift_y*cos(0-this->yaw));
-
-	}
-	
-	std::cout << "shift points to car's co-ord sys" << std::endl;
-
-	for(int i = 0; i < ptsx.size(); i++)
-	{
-		std::cout << "bf x: " << ptsx[i] << "   bf y: " << ptsy[i] << std::endl;
-	}
-
-	//create spline 
-	tk::spline s;
-
-	//set points to the spline
-	s.set_points(ptsx, ptsy);
-
-        std::cout << "set points to the spline" << std::endl;
-
-	//Declare actual points
-	//vector<double> next_x_vals;
-	//vector<double> next_y_vals;
-
 	//start with all residual points from last plan
 	for(int i = 0; i < previous_path_x.size(); i++)
 	{
@@ -577,56 +533,122 @@ void Vehicle::keep_lane_trajectory(map<int, Vehicle> vehicles) {
 		next_y_vals.push_back(previous_path_y[i]);		
 	}	
 
+	//plan next period
+	int samples_per_plan = (int) PLANNING_LEN*SAMPLES_PER_SEC;
+	if(previous_path_x.size() < (2*samples_per_plan)){
 
-        std::cout << "Added all residual points from last plan" << std::endl;
+                const int lane_fixed = 1;	
 
-	//calculate how to break up spline points to travel at desired velocity
-	double target_x = 30.0;
-	double target_y = s(target_x);
-	double target_dist = sqrt((target_x)*(target_x)+(target_y)*(target_y));
+		vector<float> kinematics = get_kinematics(vehicles, lane_fixed);//this->lane);
+		float new_t = kinematics[0];
+		float new_v = kinematics[1];
+		float new_a = kinematics[2];
 
-	double x_add_on = 0;
+		std::cout << "kinematics: s=" << new_t << ", v=" << new_v << ", a=" << new_a << std::endl;
+
+		//In Fresnet add evenly 30m spaced points ahread of the starting reference
+		vector<double> next_wp0 = getXY(this->end_path_s+30, 2+4*lane_fixed, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+		vector<double> next_wp1 = getXY(this->end_path_s+60, 2+4*lane_fixed, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+		vector<double> next_wp2 = getXY(this->end_path_s+90, 2+4*lane_fixed, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+
+		std::cout << "Added 30/60/90 points" << std::endl; 
+
+		ptsx.push_back(next_wp0[0]);	
+		ptsx.push_back(next_wp1[0]);
+		ptsx.push_back(next_wp2[0]);
+
+		ptsy.push_back(next_wp0[1]);	
+		ptsy.push_back(next_wp1[1]);
+		ptsy.push_back(next_wp2[1]);
 
 
-        std::cout << "begin fgilling remaining points" << std::endl;
-
-	double current_speed_mps = conv_mph_2_mps(this->v);
-	double current_planning_time = 0.0;
-
-	//fill up rest of the path after adding previous points, output 50 pts
-	for(int i = 1; i <= 50-previous_path_x.size(); i++)
-	{
-		double N; 
-		if(current_planning_time < new_t){
-			double accel_dist_comp = new_a > 0.0 ? 0.5*SAMPLING_TIME*SAMPLING_TIME*new_a: -0.5*SAMPLING_TIME*SAMPLING_TIME*new_a; 
-			N = (target_dist/(SAMPLING_TIME*current_speed_mps + accel_dist_comp));
-			current_speed_mps += new_a*SAMPLING_TIME;
-		//	std::cout << "accelerating" << std::endl;		
-		}else{
-			N = (target_dist/current_speed_mps);
-		//	std::cout << "const speed" << std::endl;
+		for(int i = 0; i < ptsx.size(); i++)
+		{
+			std::cout << "bf x: " << ptsx[i] << "   bf y: " << ptsy[i] << std::endl;
 		}
-		current_planning_time += SAMPLING_TIME;
-		//std::cout << "Current speed: " << current_speed_mps << " m/s^2   Current time: " << current_planning_time << std::endl;
-		double x_point = x_add_on+target_x/N;
-		double y_point = s(x_point);
+
+		for(int i = 0; i < ptsx.size(); i++)
+		{
+			//shift car ref angle to 0 deg
+			double shift_x = ptsx[i]-this->end_path_x;
+			double shift_y = ptsy[i]-this->end_path_y;
+
+			ptsx[i] = (shift_x*cos(0-this->end_path_yaw)-shift_y*sin(0-this->end_path_yaw));
+			ptsy[i] = (shift_x*sin(0-this->end_path_yaw)+shift_y*cos(0-this->end_path_yaw));
+
+		}
 		
-		x_add_on = x_point;
+		std::cout << "shift points to car's co-ord sys" << std::endl;
 
-		double x_ref = x_point;
-		double y_ref = y_point;
+		for(int i = 0; i < ptsx.size(); i++)
+		{
+			std::cout << "bf x: " << ptsx[i] << "   bf y: " << ptsy[i] << std::endl;
+		}
 
-		//rotate back to sim co-ords
-		x_point = (x_ref*cos(this->yaw)-y_ref*sin(this->yaw));
-		y_point = (x_ref*sin(this->yaw)+y_ref*cos(this->yaw));
+		//create spline 
+		tk::spline s;
 
-		x_point += this->x;
-		y_point += this->y;
-		next_x_vals.push_back(x_point);
-		next_y_vals.push_back(y_point);
+		//set points to the spline
+		s.set_points(ptsx, ptsy);
 
-		//std::cout << "next_x_vals: " << x_point << " next_y_vals: " << y_point << std::endl;			
+		std::cout << "set points to the spline" << std::endl;
 
+		//Declare actual points
+		//vector<double> next_x_vals;
+		//vector<double> next_y_vals;
+
+		
+		std::cout << "Added all residual points from last plan" << std::endl;
+
+		//calculate how to break up spline points to travel at desired velocity
+		double target_x = 35.0;
+		double target_y = s(target_x);
+		double target_dist = sqrt((target_x)*(target_x)+(target_y)*(target_y));
+
+		double x_add_on = 0;
+
+
+		std::cout << "begin fgilling remaining points" << std::endl;
+
+		double current_speed_mps = conv_mph_2_mps(this->end_path_v);
+		double current_planning_time = 0.0;
+
+		//fill up rest of the path after adding previous points, output 50 pts
+	
+		for(int i = 1; i <= samples_per_plan;  i++)
+		{
+			double N; 
+			if(current_planning_time < new_t){
+				double accel_dist_comp = new_a > 0.0 ? 0.5*SAMPLING_TIME*SAMPLING_TIME*new_a: -0.5*SAMPLING_TIME*SAMPLING_TIME*new_a; 
+				N = (target_dist/(SAMPLING_TIME*current_speed_mps + accel_dist_comp));
+				current_speed_mps += new_a*SAMPLING_TIME;
+			//	std::cout << "accelerating" << std::endl;		
+			}else{
+				N = (target_dist/(current_speed_mps*SAMPLING_TIME));
+			//	std::cout << "const speed" << std::endl;
+			}
+			current_planning_time += SAMPLING_TIME;
+			//std::cout << "Current speed: " << current_speed_mps << " m/s^2   Current time: " << current_planning_time << std::endl;
+			double x_point = x_add_on+target_x/N;
+			double y_point = s(x_point);
+			
+			x_add_on = x_point;
+
+			double x_ref = x_point;
+			double y_ref = y_point;
+
+			//rotate back to sim co-ords
+			x_point = (x_ref*cos(this->end_path_yaw)-y_ref*sin(this->end_path_yaw));
+			y_point = (x_ref*sin(this->end_path_yaw)+y_ref*cos(this->end_path_yaw));
+
+			x_point += this->end_path_x;
+			y_point += this->end_path_y;
+			next_x_vals.push_back(x_point);
+			next_y_vals.push_back(y_point);
+
+			//std::cout << "next_x_vals: " << x_point << " next_y_vals: " << y_point << std::endl;			
+
+		}
 	}
 
 	
@@ -742,9 +764,9 @@ bool Vehicle::get_vehicle_ahead(map<int, Vehicle> vehicles, int lane, Vehicle & 
 	for (map<int, Vehicle>::iterator it = vehicles.begin(); it != vehicles.end(); ++it) {
 		std::cout << "Vehicle id: " << it->first << std::endl;
 		temp_vehicle = it->second;
-		float curr_distance = (temp_vehicle.s - this->s);  
-		if (temp_vehicle.lane == this->lane && temp_vehicle.s > this->s && curr_distance < IN_RANGE) {
-			std::cout << "found vehicle" << std::endl;
+		float curr_distance = (temp_vehicle.s - this->end_path_s);  
+		if (temp_vehicle.lane == lane && temp_vehicle.s > this->end_path_s && curr_distance < IN_RANGE) {
+			std::cout << "found vehicle " << curr_distance << "m ahead in lane " << lane << std::endl;
 			min_distance = curr_distance;
 			rVehicle = temp_vehicle;
 			found_vehicle = true;

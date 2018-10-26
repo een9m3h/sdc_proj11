@@ -34,7 +34,7 @@ public:
   
   vector<double> ptsy;  //y-points to give to sim for path planning
 
-  //Declare actual points
+  //Declare actual points to be given to simulator
   vector<double> next_x_vals;
   vector<double> next_y_vals;
 
@@ -43,8 +43,11 @@ public:
   vector<double> map_waypoints_s;
 
   double end_path_d;
-
   double end_path_s; 
+  double end_path_x;
+  double end_path_y;
+  double end_path_yaw;
+  double end_path_v;
 
   double s;
 
@@ -96,7 +99,11 @@ public:
   static double calc_yaw(double dx, double dy);
 
   double conv_mph_2_mps(double v);
-  
+ 
+  double conv_mps_2_mph(double v);
+
+
+
   void choose_next_state(map<int, Vehicle> vehicles, vector<double> &next_x_vals, vector<double> &next_y_vals);
 
   vector<string> successor_states();
