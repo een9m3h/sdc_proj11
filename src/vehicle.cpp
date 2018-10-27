@@ -33,7 +33,7 @@ double rad2deg(double x) { return x * 180 / pi(); }
 
 Vehicle::Vehicle(){}
 
-Vehicle::Vehicle(double x, double y, double vx, double vy, double s, double d, string state){
+/*Vehicle::Vehicle(double x, double y, double vx, double vy, double s, double d, string state){
 
 	this->x = x;
 	this->y = y;
@@ -41,11 +41,11 @@ Vehicle::Vehicle(double x, double y, double vx, double vy, double s, double d, s
 	this->d = d;
 	calc_yaw(vx, vy);
 	calc_speed(vx, vy);
-
+	this->lane = calc_lane_from_d(this->d);
 
 }
-
-Vehicle::Vehicle(double x, double y , double s , double d, double yaw, double v){
+*/
+Vehicle::Vehicle(double x, double y , double s , double d, double yaw, double v, string state){
 
 	this->x = x;
 	this->y = y;
@@ -53,7 +53,8 @@ Vehicle::Vehicle(double x, double y , double s , double d, double yaw, double v)
 	this->d = d;
 	this->yaw = yaw;
 	this->v = v;
-	this->state = "KL";
+	this->state = state;
+	this->lane = calc_lane_from_d(d);
 }
 
 
@@ -70,6 +71,20 @@ Vehicle::Vehicle(int lane, float s, float v, float a, string state) {
 }
 
 Vehicle::~Vehicle() {}
+
+int Vehicle::calc_lane_from_d(double d){
+
+	int lane = 0;
+	if(d < 4.0)
+		lane = 0;
+	else if(d < 8.0)
+		lane = 1;
+	else
+		lane = 2;
+	return lane;
+		
+
+}
 
 void Vehicle::add_prev_path(vector<double> px, vector<double> py, double end_path_d, double end_path_s){
 
@@ -447,7 +462,7 @@ vector<float> Vehicle::get_kinematics(map<int, Vehicle> vehicles, int lane) {
 		new_time_in_acc = abs(2*target_dist)/abs(speed_delta);
 	    	new_accel 	= speed_delta/new_time_in_acc;
 		new_accel 	= new_accel < -MAX_ACC ? -MAX_ACC : new_accel; //limit accelateration
-	        new_time_in_acc = speed_delta/-new_accel;	// re-compute time in acc if saturated acc
+	        new_time_in_acc = -speed_delta/-new_accel;	// re-compute time in acc if saturated acc
 		new_velocity 	= vehicle_ahead.v;
 	    }
 	    else if(speed_delta >= 0.0 && target_dist < 0.0){
@@ -762,9 +777,9 @@ bool Vehicle::get_vehicle_ahead(map<int, Vehicle> vehicles, int lane, Vehicle & 
 	Vehicle temp_vehicle;
 	float min_distance = IN_RANGE;
 	for (map<int, Vehicle>::iterator it = vehicles.begin(); it != vehicles.end(); ++it) {
-		std::cout << "Vehicle id: " << it->first << std::endl;
 		temp_vehicle = it->second;
 		float curr_distance = (temp_vehicle.s - this->end_path_s);  
+		std::cout << "Vehicle id: " << it->first <<  ", " << curr_distance << "m ahead in lane " << temp_vehicle.lane << " (d=" << temp_vehicle.d << ")" << std::endl;
 		if (temp_vehicle.lane == lane && temp_vehicle.s > this->end_path_s && curr_distance < IN_RANGE) {
 			std::cout << "found vehicle " << curr_distance << "m ahead in lane " << lane << std::endl;
 			min_distance = curr_distance;

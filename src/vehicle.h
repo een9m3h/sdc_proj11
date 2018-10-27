@@ -81,12 +81,14 @@ public:
   Vehicle();
   Vehicle(int lane, float s, float v, float a, string state="CS");
   Vehicle(double x, double y , double s , double d, double yaw, double v, string state="CS");
-  Vehicle(double x, double y, double vx, double vy, double s, double d);
+  //Vehicle(double x, double y, double vx, double vy, double s, double d);
 
   /**
   * Destructor
   */
   virtual ~Vehicle();
+
+  int calc_lane_from_d(double d);
 
   void update_waypoints(vector<double> map_waypoints_x, vector<double> map_waypoints_y, vector<double> map_waypoints_s);
 

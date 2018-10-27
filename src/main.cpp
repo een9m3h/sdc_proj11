@@ -274,6 +274,7 @@ int main() {
 
 		for(int i = 0; i < sensor_fusion.size(); i++)
 		{
+			double id 	= sensor_fusion[i][0];
 			double x 	= sensor_fusion[i][1];
 			double y 	= sensor_fusion[i][2];
 			double vx 	= sensor_fusion[i][3];
@@ -284,7 +285,7 @@ int main() {
 			double speed 	= Vehicle::calc_speed(vx, vy);	
 
 			Vehicle vehicle = Vehicle(x,y,s,d, yaw, speed, "KL");
-			vehicles.insert(std::pair<int, Vehicle>(i, vehicle));
+			vehicles.insert(std::pair<int, Vehicle>(id, vehicle));
 
 		}
 
