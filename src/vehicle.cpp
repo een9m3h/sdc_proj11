@@ -11,7 +11,7 @@
 //planning window defines
 #define SAMPLES_PER_SEC 50
 #define SAMPLING_TIME 0.02
-#define PLANNING_LEN  2.0 //secs
+#define PLANNING_LEN  1.0 //secs
 #define METER_PER_MILE 1609.34 
 #define SEC_PER_HOUR 3600
 #define TARGET_SPEED 45.0 // MPH
@@ -562,6 +562,10 @@ trajectory_t Vehicle::keep_lane_trajectory(map<int, Vehicle> vehicles) {
     return trajectory;*/
 
 	trajectory_t pt;
+	vector<double> ptsx_local = this->ptsx;  //x-points to give to sim for path planning
+  	vector<double> ptsy_local = this->ptsy;  //y-points to give to sim for path planning
+
+
 
 	//start with all residual points from last plan
 	for(int i = 0; i < previous_path_x.size(); i++)
@@ -590,43 +594,43 @@ trajectory_t Vehicle::keep_lane_trajectory(map<int, Vehicle> vehicles) {
 
 		std::cout << "Added 30/60/90 points" << std::endl; 
 
-		ptsx.push_back(next_wp0[0]);	
-		ptsx.push_back(next_wp1[0]);
-		ptsx.push_back(next_wp2[0]);
+		ptsx_local.push_back(next_wp0[0]);	
+		ptsx_local.push_back(next_wp1[0]);
+		ptsx_local.push_back(next_wp2[0]);
 
-		ptsy.push_back(next_wp0[1]);	
-		ptsy.push_back(next_wp1[1]);
-		ptsy.push_back(next_wp2[1]);
+		ptsy_local.push_back(next_wp0[1]);	
+		ptsy_local.push_back(next_wp1[1]);
+		ptsy_local.push_back(next_wp2[1]);
 
 
-		for(int i = 0; i < ptsx.size(); i++)
+		for(int i = 0; i < ptsx_local.size(); i++)
 		{
-			std::cout << "bf x: " << ptsx[i] << "   bf y: " << ptsy[i] << std::endl;
+			std::cout << "bf x: " << ptsx_local[i] << "   bf y: " << ptsy_local[i] << std::endl;
 		}
 
-		for(int i = 0; i < ptsx.size(); i++)
+		for(int i = 0; i < ptsx_local.size(); i++)
 		{
 			//shift car ref angle to 0 deg
-			double shift_x = ptsx[i]-this->end_path_x;
-			double shift_y = ptsy[i]-this->end_path_y;
+			double shift_x = ptsx_local[i]-this->end_path_x;
+			double shift_y = ptsy_local[i]-this->end_path_y;
 
-			ptsx[i] = (shift_x*cos(0-this->end_path_yaw)-shift_y*sin(0-this->end_path_yaw));
-			ptsy[i] = (shift_x*sin(0-this->end_path_yaw)+shift_y*cos(0-this->end_path_yaw));
+			ptsx_local[i] = (shift_x*cos(0-this->end_path_yaw)-shift_y*sin(0-this->end_path_yaw));
+			ptsy_local[i] = (shift_x*sin(0-this->end_path_yaw)+shift_y*cos(0-this->end_path_yaw));
 
 		}
 		
 		std::cout << "shift points to car's co-ord sys" << std::endl;
 
-		for(int i = 0; i < ptsx.size(); i++)
+		for(int i = 0; i < ptsx_local.size(); i++)
 		{
-			std::cout << "bf x: " << ptsx[i] << "   bf y: " << ptsy[i] << std::endl;
+			std::cout << "bf x: " << ptsx_local[i] << "   bf y: " << ptsy_local[i] << std::endl;
 		}
 
 		//create spline 
 		tk::spline s;
 
 		//set points to the spline
-		s.set_points(ptsx, ptsy);
+		s.set_points(ptsx_local, ptsy_local);
 
 		std::cout << "set points to the spline" << std::endl;
 
@@ -756,6 +760,9 @@ trajectory_t Vehicle::lane_change_trajectory(string state, map<int, Vehicle> veh
     return trajectory;*/
 
     	trajectory_t pt; // planned_trajectory
+	vector<double> ptsx_local = this->ptsx;  //x-points to give to sim for path planning
+  	vector<double> ptsy_local = this->ptsy;  //y-points to give to sim for path planning
+
 	//start with all residual points from last plan
 	for(int i = 0; i < previous_path_x.size(); i++)
 	{
@@ -801,46 +808,46 @@ trajectory_t Vehicle::lane_change_trajectory(string state, map<int, Vehicle> veh
 
 		std::cout << "Added 30/60/90 points" << std::endl; 
 
-		ptsx.push_back(next_wp0[0]);	
-		ptsx.push_back(next_wp1[0]);
-		ptsx.push_back(next_wp2[0]);
-		ptsx.push_back(next_wp3[0]);
+	//	ptsx_local.push_back(next_wp0[0]);	
+	//	ptsx_local.push_back(next_wp1[0]);
+		ptsx_local.push_back(next_wp2[0]);
+		ptsx_local.push_back(next_wp3[0]);
 
 
-		ptsy.push_back(next_wp0[1]);	
-		ptsy.push_back(next_wp1[1]);
-		ptsy.push_back(next_wp2[1]);
-		ptsy.push_back(next_wp3[1]);
+	//	ptsy_local.push_back(next_wp0[1]);	
+	//	ptsy_local.push_back(next_wp1[1]);
+		ptsy_local.push_back(next_wp2[1]);
+		ptsy_local.push_back(next_wp3[1]);
 
 
-		for(int i = 0; i < ptsx.size(); i++)
+		for(int i = 0; i < ptsx_local.size(); i++)
 		{
-			std::cout << "bf x: " << ptsx[i] << "   bf y: " << ptsy[i] << std::endl;
+			std::cout << "bf x: " << ptsx_local[i] << "   bf y: " << ptsy_local[i] << std::endl;
 		}
 
-		for(int i = 0; i < ptsx.size(); i++)
+		for(int i = 0; i < ptsx_local.size(); i++)
 		{
 			//shift car ref angle to 0 deg
-			double shift_x = ptsx[i]-this->end_path_x;
-			double shift_y = ptsy[i]-this->end_path_y;
+			double shift_x = ptsx_local[i]-this->end_path_x;
+			double shift_y = ptsy_local[i]-this->end_path_y;
 
-			ptsx[i] = (shift_x*cos(0-this->end_path_yaw)-shift_y*sin(0-this->end_path_yaw));
-			ptsy[i] = (shift_x*sin(0-this->end_path_yaw)+shift_y*cos(0-this->end_path_yaw));
+			ptsx_local[i] = (shift_x*cos(0-this->end_path_yaw)-shift_y*sin(0-this->end_path_yaw));
+			ptsy_local[i] = (shift_x*sin(0-this->end_path_yaw)+shift_y*cos(0-this->end_path_yaw));
 
 		}
 		
 		std::cout << "shift points to car's co-ord sys" << std::endl;
 
-		for(int i = 0; i < ptsx.size(); i++)
+		for(int i = 0; i < ptsx_local.size(); i++)
 		{
-			std::cout << "bf x: " << ptsx[i] << "   bf y: " << ptsy[i] << std::endl;
+			std::cout << "bf x: " << ptsx_local[i] << "   bf y: " << ptsy_local[i] << std::endl;
 		}
 
 		//create spline 
 		tk::spline s;
 
 		//set points to the spline
-		s.set_points(ptsx, ptsy);
+		s.set_points(ptsx_local, ptsy_local);
 
 		std::cout << "set points to the spline" << std::endl;
 
@@ -914,12 +921,12 @@ trajectory_t Vehicle::lane_change_trajectory(string state, map<int, Vehicle> veh
 	return pt;
 }
 
-void Vehicle::increment(int dt = 1) {
+void Vehicle::increment(float dt = 1.0) {
 	this->s = position_at(dt);
 }
 
-float Vehicle::position_at(int t) {
-    return this->s + this->v*t + this->a*t*t/2.0;
+float Vehicle::position_at(float t) {
+    return this->s + conv_mph_2_mps(this->v)*t + this->a*t*t/2.0;
 }
 
 bool Vehicle::get_vehicle_behind(map<int, Vehicle> vehicles, int lane, Vehicle & rVehicle) {
@@ -976,22 +983,18 @@ bool Vehicle::get_vehicle_ahead(map<int, Vehicle> vehicles, int lane, Vehicle & 
 	return found_vehicle;
 }
 
-vector<Vehicle> Vehicle::generate_predictions(int horizon) {
+vector<double> Vehicle::generate_predictions(float horizon) {
     /*
     Generates predictions for non-ego vehicles to be used
     in trajectory generation for the ego vehicle.
     */
-	vector<Vehicle> vehicles;
-    for(int i = 0; i < horizon; i++) {
-      float next_s = position_at(i);
-      float next_v = 0;
-      if (i < horizon-1) {
-        next_v = position_at(i+1) - s;
-      }
-      vehicles.push_back(Vehicle(this->lane, next_s, next_v, 0));
-  	}
-    return vehicles;
 
+	vector<double> path_s;
+	unsigned int sample_num = (int) horizon*SAMPLES_PER_SEC;
+	for(int i=0; i<sample_num; i++){
+		path_s.push_back(position_at(sample_num*SAMPLING_TIME));
+	}
+	return path_s;
 }
 
 void Vehicle::realize_next_state(vector<Vehicle> trajectory) {

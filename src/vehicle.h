@@ -132,15 +132,15 @@ public:
 
   vector<Vehicle> prep_lane_change_trajectory(string state, map<int, Vehicle> vehicles);
 
-  void increment(int dt);
+  void increment(float dt);
 
-  float position_at(int t);
+  float position_at(float t);
 
   bool get_vehicle_behind(map<int, Vehicle> vehicles, int lane, Vehicle & rVehicle);
 
   bool get_vehicle_ahead(map<int, Vehicle> vehicles, int lane, Vehicle & rVehicle);
 
-  vector<Vehicle> generate_predictions(int horizon=2);
+  vector<double> generate_predictions(float horizon = 1.0);
 
   void realize_next_state(vector<Vehicle> trajectory);
 
