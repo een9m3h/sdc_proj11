@@ -8,6 +8,15 @@
 
 using namespace std;
 
+
+struct trajectory_t {
+
+	vector<double> 	next_x_vals;
+	vector<double> 	next_y_vals;
+	double 		final_velocity;
+};
+
+
 class Vehicle {
 public:
 
@@ -111,15 +120,15 @@ public:
   vector<string> successor_states();
 
   //vector<Vehicle>
-  void generate_trajectory(string state, map<int, Vehicle> vehicles);
+  vector<trajectory_t>  generate_trajectory(string state, map<int, Vehicle> vehicles);
 
   vector<float> get_kinematics(map<int, Vehicle> vehicles, int lane);
 
   vector<Vehicle> constant_speed_trajectory();
 
-  void keep_lane_trajectory(map<int, Vehicle> vehicles);
+  trajectory_t keep_lane_trajectory(map<int, Vehicle> vehicles);
 
-  vector<Vehicle> lane_change_trajectory(string state, map<int, Vehicle> vehicles);
+  trajectory_t lane_change_trajectory(string state, map<int, Vehicle> vehicles, int target_lane);
 
   vector<Vehicle> prep_lane_change_trajectory(string state, map<int, Vehicle> vehicles);
 

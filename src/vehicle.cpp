@@ -5,13 +5,13 @@
 #include <map>
 #include <string>
 #include <iterator>
-//#include "cost.h"
+#include "cost.h"
 #include "spline.h"
 
 //planning window defines
 #define SAMPLES_PER_SEC 50
 #define SAMPLING_TIME 0.02
-#define PLANNING_LEN  1.0 //secs
+#define PLANNING_LEN  2.0 //secs
 #define METER_PER_MILE 1609.34 
 #define SEC_PER_HOUR 3600
 #define TARGET_SPEED 45.0 // MPH
@@ -28,7 +28,6 @@
 constexpr double pi() { return M_PI; }
 double deg2rad(double x) { return x * pi() / 180; }
 double rad2deg(double x) { return x * 180 / pi(); }
-
 
 
 Vehicle::Vehicle(){}
@@ -344,27 +343,29 @@ void Vehicle::choose_next_state(map<int, Vehicle> vehicles, vector<double> &next
     vector<float> costs;
     vector<string> final_states;
     */
-    vector<vector<Vehicle>> final_trajectories;
+    vector<trajectory_t> trajectories;
     
-    generate_trajectory("KL", vehicles);
+    trajectories = generate_trajectory("KL", vehicles);
 
+    
+    float cost;
+    vector<float> costs;
 
-    /*for (vector<string>::iterator it = states.begin(); it != states.end(); ++it) {
-        vector<Vehicle> trajectory = generate_trajectory(*it, predictions);
-        if (trajectory.size() != 0) {
-            cost = calculate_cost(*this, predictions, trajectory);
-            costs.push_back(cost);
-            final_trajectories.push_back(trajectory);
-        }
+    for (vector<trajectory_t>::iterator it = trajectories.begin(); it != trajectories.end(); ++it) {
+        trajectory_t trajectory = *it;
+    	cost = calculate_cost(*this, vehicles, trajectory);
+    	costs.push_back(cost);
+    	//final_trajectories.push_back(trajectory);
+
     }
 
     vector<float>::iterator best_cost = min_element(begin(costs), end(costs));
-    int best_idx = distance(begin(costs), best_cost);*/
+    int best_idx = distance(begin(costs), best_cost);
     //int best_idx = 0;
     //return final_trajectories[best_idx];
    
-    next_x_vals = this->next_x_vals;
-    next_y_vals = this->next_y_vals;
+    next_x_vals = trajectories[best_idx].next_x_vals;
+    next_y_vals = trajectories[best_idx].next_y_vals;
 
     std::cout << "func end: choose_next_state" << std::endl;
 }
@@ -401,7 +402,7 @@ vector<string> Vehicle::successor_states() {
 }
 
 //vector<Vehicle>
-void Vehicle::generate_trajectory(string state, map<int, Vehicle> vehicles) {
+vector<trajectory_t> Vehicle::generate_trajectory(string state, map<int, Vehicle> vehicles) {
     /*
     Given a possible next state, generate the appropriate trajectory to realize the next state.
     */
@@ -409,20 +410,39 @@ void Vehicle::generate_trajectory(string state, map<int, Vehicle> vehicles) {
     std::cout << "Func: generate_trajectory" << std::endl;
 
 
-    vector<Vehicle> trajectory;
+    const int current_lane = calc_lane_from_d(this->end_path_d);
+    vector<trajectory_t> trajectories;
+
+    switch (current_lane){
+	    case 0:
+	    case 2:
+	     	trajectories.push_back(keep_lane_trajectory(vehicles));
+	     	trajectories.push_back(lane_change_trajectory(state, vehicles,1));
+	     	break;
+	    case 1:
+		trajectories.push_back(keep_lane_trajectory(vehicles));
+	     	trajectories.push_back(lane_change_trajectory(state, vehicles,0));
+		trajectories.push_back(lane_change_trajectory(state, vehicles,2));
+		break;
+	    default:
+	       break;
+    }	       
+
+
+	/*
     if (state.compare("CS") == 0) {
-        trajectory = constant_speed_trajectory();
+        //trajectory = constant_speed_trajectory();
     } else if (state.compare("KL") == 0) {
         //trajectory = 
-	keep_lane_trajectory(vehicles);
+	trajectory.push_back(keep_lane_trajectory(vehicles));
     } else if (state.compare("LCL") == 0 || state.compare("LCR") == 0) {
         trajectory = lane_change_trajectory(state, vehicles);
     } else if (state.compare("PLCL") == 0 || state.compare("PLCR") == 0) {
         trajectory = prep_lane_change_trajectory(state, vehicles);
-    }
+    }*/
 
     std::cout << "func end: generate_trajectory" << std::endl;
-    //return trajectory;
+    return trajectories;
 }
 
 vector<float> Vehicle::get_kinematics(map<int, Vehicle> vehicles, int lane) {
@@ -481,7 +501,7 @@ vector<float> Vehicle::get_kinematics(map<int, Vehicle> vehicles, int lane) {
                 new_time_in_acc = PLANNING_LEN;
 		float t1 = ((target_dist*target_dist)*abs(speed_delta))/(new_time_in_acc*2.0 + target_dist*2.0*abs(speed_delta));
 		new_accel = speed_delta/t1;
-		new_velocity = conv_mph_2_mps(this->v) + new_accel*new_time_in_acc;
+		new_velocity = conv_mps_2_mph(conv_mph_2_mps(this->v) + new_accel*new_time_in_acc);
 			
 	    }
    
@@ -525,7 +545,7 @@ vector<Vehicle> Vehicle::constant_speed_trajectory() {
     return trajectory;
 }
 
-void Vehicle::keep_lane_trajectory(map<int, Vehicle> vehicles) {
+trajectory_t Vehicle::keep_lane_trajectory(map<int, Vehicle> vehicles) {
     /*
     Generate a keep lane trajectory.
     */
@@ -541,18 +561,20 @@ void Vehicle::keep_lane_trajectory(map<int, Vehicle> vehicles) {
     trajectory.push_back(Vehicle(this->lane, new_s, new_v, new_a, "KL"));
     return trajectory;*/
 
+	trajectory_t pt;
+
 	//start with all residual points from last plan
 	for(int i = 0; i < previous_path_x.size(); i++)
 	{
-		next_x_vals.push_back(previous_path_x[i]);
-		next_y_vals.push_back(previous_path_y[i]);		
+		pt.next_x_vals.push_back(previous_path_x[i]);
+		pt.next_y_vals.push_back(previous_path_y[i]);		
 	}	
 
 	//plan next period
 	int samples_per_plan = (int) PLANNING_LEN*SAMPLES_PER_SEC;
 	if(previous_path_x.size() < (2*samples_per_plan)){
 
-                const int lane_fixed = 1;	
+                const int lane_fixed = calc_lane_from_d(this->end_path_d);	
 
 		vector<float> kinematics = get_kinematics(vehicles, lane_fixed);//this->lane);
 		float new_t = kinematics[0];
@@ -658,16 +680,22 @@ void Vehicle::keep_lane_trajectory(map<int, Vehicle> vehicles) {
 
 			x_point += this->end_path_x;
 			y_point += this->end_path_y;
-			next_x_vals.push_back(x_point);
-			next_y_vals.push_back(y_point);
+			pt.next_x_vals.push_back(x_point);
+			pt.next_y_vals.push_back(y_point);
 
 			//std::cout << "next_x_vals: " << x_point << " next_y_vals: " << y_point << std::endl;			
 
 		}
+		pt.final_velocity = new_v;
+	}
+	else{
+		pt.final_velocity = end_path_v;
 	}
 
 	
         std::cout << "Func end: keep_lane_trajectory" << std::endl;
+
+	return pt;
 }
 
 vector<Vehicle> Vehicle::prep_lane_change_trajectory(string state, map<int, Vehicle> vehicles) {
@@ -710,26 +738,180 @@ vector<Vehicle> Vehicle::prep_lane_change_trajectory(string state, map<int, Vehi
     return trajectory;
 }
 
-vector<Vehicle> Vehicle::lane_change_trajectory(string state, map<int, Vehicle> vehicles) {
+trajectory_t Vehicle::lane_change_trajectory(string state, map<int, Vehicle> vehicles, int target_lane) {
     /*
     Generate a lane change trajectory.
     */
-    int new_lane = this->lane + lane_direction[state];
-    vector<Vehicle> trajectory;
-    /*Vehicle next_lane_vehicle;
-    //Check if a lane change is possible (check if another vehicle occupies that spot).
-    for (map<int, vector<Vehicle>>::iterator it = vehicles.begin(); it != vehicles.end(); ++it) {
-        next_lane_vehicle = it->second[0];
-        if (next_lane_vehicle.s == this->s && next_lane_vehicle.lane == new_lane) {
-            //If lane change is not possible, return empty trajectory.
-            return trajectory;
-        }
-    }
-    trajectory.push_back(Vehicle(this->lane, this->s, this->v, this->a, this->state));
-    vector<float> kinematics = get_kinematics(vehicles, new_lane);
-    trajectory.push_back(Vehicle(new_lane, kinematics[0], kinematics[1], kinematics[2], state));
-    */
-    return trajectory;
+
+
+    std::cout << "Func: lane_change_trajectory" << std::endl;
+
+    
+    /*vector<Vehicle> trajectory = {Vehicle(lane, this->s, this->v, this->a, state)};
+    vector<float> kinematics = get_kinematics(predictions, this->lane);
+    float new_s = kinematics[0];
+    float new_v = kinematics[1];
+    float new_a = kinematics[2];
+    trajectory.push_back(Vehicle(this->lane, new_s, new_v, new_a, "KL"));
+    return trajectory;*/
+
+    	trajectory_t pt; // planned_trajectory
+	//start with all residual points from last plan
+	for(int i = 0; i < previous_path_x.size(); i++)
+	{
+		pt.next_x_vals.push_back(previous_path_x[i]);
+		pt.next_y_vals.push_back(previous_path_y[i]);		
+	}	
+
+	//plan next period
+	int samples_per_plan = (int) PLANNING_LEN*SAMPLES_PER_SEC;
+	if(previous_path_x.size() < (2*samples_per_plan)){
+
+                const int lane_fixed = calc_lane_from_d(this->end_path_d);	
+
+		double plan_dist_travelled = 0.0;
+
+		vector<float> kinematics = get_kinematics(vehicles, target_lane);//this->lane);
+		float new_t = kinematics[0];
+		float new_v = kinematics[1];
+		float new_a = kinematics[2];
+
+
+		double current_planning_time = 0.0;
+
+		for(int i = 1; i <= samples_per_plan;  i++)
+		{ 
+			if(current_planning_time < new_t)
+				plan_dist_travelled += 0.5*SAMPLING_TIME*SAMPLING_TIME*new_a; //dist due to acc 
+			plan_dist_travelled += conv_mph_2_mps(this->end_path_v)*SAMPLING_TIME; // dist due to velocity
+			current_planning_time += SAMPLING_TIME;
+		}
+
+
+
+		std::cout << "kinematics: s=" << new_t << ", v=" << new_v << ", a=" << new_a << std::endl;
+
+		//In Fresnet add evenly 30m spaced points ahread of the starting reference
+		vector<double> next_wp0 = getXY(this->end_path_s+plan_dist_travelled/10.0, 2+4*lane_fixed, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+		vector<double> next_wp1 = getXY(this->end_path_s+plan_dist_travelled/2.0, 2+4*lane_fixed+(target_lane-lane_fixed)*2, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+		vector<double> next_wp2 = getXY(this->end_path_s+plan_dist_travelled, 2+4*target_lane, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+		vector<double> next_wp3 = getXY(this->end_path_s+plan_dist_travelled*1.2, 2+4*target_lane, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+
+
+
+		std::cout << "Added 30/60/90 points" << std::endl; 
+
+		ptsx.push_back(next_wp0[0]);	
+		ptsx.push_back(next_wp1[0]);
+		ptsx.push_back(next_wp2[0]);
+		ptsx.push_back(next_wp3[0]);
+
+
+		ptsy.push_back(next_wp0[1]);	
+		ptsy.push_back(next_wp1[1]);
+		ptsy.push_back(next_wp2[1]);
+		ptsy.push_back(next_wp3[1]);
+
+
+		for(int i = 0; i < ptsx.size(); i++)
+		{
+			std::cout << "bf x: " << ptsx[i] << "   bf y: " << ptsy[i] << std::endl;
+		}
+
+		for(int i = 0; i < ptsx.size(); i++)
+		{
+			//shift car ref angle to 0 deg
+			double shift_x = ptsx[i]-this->end_path_x;
+			double shift_y = ptsy[i]-this->end_path_y;
+
+			ptsx[i] = (shift_x*cos(0-this->end_path_yaw)-shift_y*sin(0-this->end_path_yaw));
+			ptsy[i] = (shift_x*sin(0-this->end_path_yaw)+shift_y*cos(0-this->end_path_yaw));
+
+		}
+		
+		std::cout << "shift points to car's co-ord sys" << std::endl;
+
+		for(int i = 0; i < ptsx.size(); i++)
+		{
+			std::cout << "bf x: " << ptsx[i] << "   bf y: " << ptsy[i] << std::endl;
+		}
+
+		//create spline 
+		tk::spline s;
+
+		//set points to the spline
+		s.set_points(ptsx, ptsy);
+
+		std::cout << "set points to the spline" << std::endl;
+
+		//Declare actual points
+		//vector<double> next_x_vals;
+		//vector<double> next_y_vals;
+
+		
+		std::cout << "Added all residual points from last plan" << std::endl;
+
+		//calculate how to break up spline points to travel at desired velocity
+		double target_x = 35.0;
+		double target_y = s(target_x);
+		double target_dist = sqrt((target_x)*(target_x)+(target_y)*(target_y));
+
+		double x_add_on = 0;
+
+
+		std::cout << "begin fgilling remaining points" << std::endl;
+
+		double current_speed_mps = conv_mph_2_mps(this->end_path_v);
+		current_planning_time = 0.0;
+
+		//fill up rest of the path after adding previous points, output 50 pts
+
+
+		for(int i = 1; i <= samples_per_plan;  i++)
+		{
+			double N; 
+			if(current_planning_time < new_t){
+				double accel_dist_comp = new_a > 0.0 ? 0.5*SAMPLING_TIME*SAMPLING_TIME*new_a: -0.5*SAMPLING_TIME*SAMPLING_TIME*new_a; 
+				N = (target_dist/(SAMPLING_TIME*current_speed_mps + accel_dist_comp));
+				current_speed_mps += new_a*SAMPLING_TIME;
+			//	std::cout << "accelerating" << std::endl;		
+			}else{
+				N = (target_dist/(current_speed_mps*SAMPLING_TIME));
+			//	std::cout << "const speed" << std::endl;
+			}
+			current_planning_time += SAMPLING_TIME;
+			//std::cout << "Current speed: " << current_speed_mps << " m/s^2   Current time: " << current_planning_time << std::endl;
+			double x_point = x_add_on+target_x/N;
+			double y_point = s(x_point);
+			
+			x_add_on = x_point;
+
+			double x_ref = x_point;
+			double y_ref = y_point;
+
+			//rotate back to sim co-ords
+			x_point = (x_ref*cos(this->end_path_yaw)-y_ref*sin(this->end_path_yaw));
+			y_point = (x_ref*sin(this->end_path_yaw)+y_ref*cos(this->end_path_yaw));
+
+			x_point += this->end_path_x;
+			y_point += this->end_path_y;
+			pt.next_x_vals.push_back(x_point);
+			pt.next_y_vals.push_back(y_point);
+
+			//std::cout << "next_x_vals: " << x_point << " next_y_vals: " << y_point << std::endl;			
+
+		}
+		pt.final_velocity = new_v;
+	}
+	else{
+		pt.final_velocity = end_path_v;
+	}
+
+
+	
+        std::cout << "Func end: lane_change_trajectory" << std::endl;
+
+	return pt;
 }
 
 void Vehicle::increment(int dt = 1) {
