@@ -8,17 +8,6 @@
 #include "cost.h"
 #include "spline.h"
 
-//planning window defines
-#define SAMPLES_PER_SEC 50
-#define SAMPLING_TIME 0.02
-#define PLANNING_LEN  1.5 //secs
-#define METER_PER_MILE 1609.34 
-#define SEC_PER_HOUR 3600
-#define TARGET_SPEED 45.0 // MPH
-#define IN_RANGE     30.0 // consider cars in this range
-#define MAX_ACC      5.0 // metres/sec^2
-#define TARGET_DIST_CAR_AHEAD 10.0  //meters
-
 /**
  * Initializes Vehicle
  */
@@ -339,7 +328,7 @@ void Vehicle::choose_next_state(map<int, Vehicle> vehicles, vector<double> &next
     this->vehicles = vehicles;
 
     //move cars along s based on velocity to start of current path plan 
-    update_predictions(this->previous_path_x.size());
+    update_predictions(this->previous_path_x.size() + PLANNING_LEN*SAMPLES_PER_SEC);
     /*
     vector<string> states = successor_states();
     float cost;
@@ -462,14 +451,19 @@ vector<float> Vehicle::get_kinematics(int lane) {
     float new_time_in_acc;
     float new_velocity;
     float new_accel;
+    float vehicle_ahead_dist = IN_RANGE;
+    float vehicle_behind_dist = IN_RANGE;
     Vehicle vehicle_ahead;
     Vehicle vehicle_behind;
 
+    if(get_vehicle_behind(lane, vehicle_behind))
+	vehicle_behind_dist = this->end_path_s - vehicle_behind.s;
+
     if (get_vehicle_ahead(lane, vehicle_ahead) && vehicle_ahead.v < TARGET_SPEED) {
 
-
+            vehicle_ahead_dist =  vehicle_ahead.s - this->end_path_s; 
   	    float speed_delta = conv_mph_2_mps(vehicle_ahead.v - this->v);
-	    float target_dist = vehicle_ahead.s - this->s - TARGET_DIST_CAR_AHEAD; //how much we can catch up to next car
+	    float target_dist = vehicle_ahead_dist - TARGET_DIST_CAR_AHEAD; //how much we can catch up to next car
 	    if(speed_delta >= 0.0 && target_dist >= 0.0){
 		//accelerate to within 10m of vehicle ahead and maintain same speed as vehicle ahead
   	        std::cout << "accelerate to within 10m of vehicle ahead and maintain same speed as vehicle ahead" << std::endl;
@@ -522,7 +516,7 @@ vector<float> Vehicle::get_kinematics(int lane) {
 	//maximum acceleration until target speed reached    
 	std::cout << "maximum acceleration until target speed reached" << std::endl;
 	new_velocity 	= TARGET_SPEED; //target speed in MPH
-	new_accel    	= this->end_path_v >= TARGET_SPEED ? 0.0: MAX_ACC;  //target acc in m/s^2
+	new_accel    	= this->end_path_v >= TARGET_SPEED ? -MAX_ACC: MAX_ACC;  //target acc in m/s^2
         new_time_in_acc = min(max(conv_mph_2_mps(TARGET_SPEED - this->end_path_v)/new_accel, 0.0), PLANNING_LEN); 	
     }
 
@@ -531,7 +525,7 @@ vector<float> Vehicle::get_kinematics(int lane) {
     
     //new_accel = new_velocity - this->v; //Equation: (v_1 - v_0)/t = acceleration
     //new_position = this->s + new_velocity + new_accel / 2.0;
-    return{new_time_in_acc, new_velocity, new_accel};
+    return{new_time_in_acc, new_velocity, new_accel, vehicle_ahead_dist, vehicle_behind_dist};
     
 }
 
@@ -569,8 +563,7 @@ trajectory_t Vehicle::keep_lane_trajectory() {
   	vector<double> ptsy_local = this->ptsy;  //y-points to give to sim for path planning
 
 
-
-	//start with all residual points from last plan
+		//start with all residual points from last plan
 	for(int i = 0; i < previous_path_x.size(); i++)
 	{
 		pt.next_x_vals.push_back(previous_path_x[i]);
@@ -579,14 +572,19 @@ trajectory_t Vehicle::keep_lane_trajectory() {
 
 	//plan next period
 	int samples_per_plan = (int) PLANNING_LEN*SAMPLES_PER_SEC;
-	if(previous_path_x.size() < (2*samples_per_plan)){
+	if(previous_path_x.size() < (samples_per_plan/2.0)){
 
-                const int lane_fixed = calc_lane_from_d(this->end_path_d);	
+               	const int lane_fixed = calc_lane_from_d(this->end_path_d);	
+
+		pt.start_lane = lane_fixed;
+		pt.end_lane   = lane_fixed;
 
 		vector<float> kinematics = get_kinematics(lane_fixed);//this->lane);
 		float new_t = kinematics[0];
 		float new_v = kinematics[1];
 		float new_a = kinematics[2];
+		pt.vehicle_ahead_dist = kinematics[3];
+		pt.vehicle_behind_dist = kinematics[4];
 
 		std::cout << "kinematics: s=" << new_t << ", v=" << new_v << ", a=" << new_a << std::endl;
 
@@ -776,7 +774,7 @@ trajectory_t Vehicle::lane_change_trajectory(string state, int target_lane) {
 
 	//plan next period
 	int samples_per_plan = (int) PLANNING_LEN*SAMPLES_PER_SEC;
-	if(previous_path_x.size() < (2*samples_per_plan)){
+	if(previous_path_x.size() < (samples_per_plan/2.0)){
 
                 const int lane_fixed = calc_lane_from_d(this->end_path_d);	
 
@@ -786,6 +784,13 @@ trajectory_t Vehicle::lane_change_trajectory(string state, int target_lane) {
 		float new_t = kinematics[0];
 		float new_v = kinematics[1];
 		float new_a = kinematics[2];
+	
+		pt.start_lane = lane_fixed;
+		pt.end_lane   = target_lane;
+
+		pt.vehicle_ahead_dist = kinematics[3];
+		pt.vehicle_behind_dist = kinematics[4];
+
 
 
 		double current_planning_time = 0.0;
@@ -948,7 +953,7 @@ bool Vehicle::get_vehicle_behind(int lane, Vehicle & rVehicle) {
     Vehicle temp_vehicle;
     for (map<int, Vehicle>::iterator it = vehicles.begin(); it != vehicles.end(); ++it) {
         temp_vehicle = it->second;
-	float curr_distance = (this->s - temp_vehicle.s);
+	float curr_distance = (this->end_path_s - temp_vehicle.s);
         if (temp_vehicle.lane == this->lane && temp_vehicle.s < this->s && curr_distance < IN_RANGE) {
             min_distance = curr_distance;
             rVehicle = temp_vehicle;

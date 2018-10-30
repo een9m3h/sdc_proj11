@@ -8,12 +8,28 @@
 
 using namespace std;
 
+//planning window defines
+#define SAMPLES_PER_SEC 50
+#define SAMPLING_TIME 0.02
+#define PLANNING_LEN  2.0 //secs
+#define METER_PER_MILE 1609.34 
+#define SEC_PER_HOUR 3600
+#define TARGET_SPEED 45.0 // MPH
+#define IN_RANGE     60.0 // consider cars in this range
+#define MAX_ACC      5.0 // metres/sec^2
+#define TARGET_DIST_CAR_AHEAD 5.0  //meters
+
+
 
 struct trajectory_t {
 
 	vector<double> 	next_x_vals;
 	vector<double> 	next_y_vals;
 	double 		final_velocity;
+	float 		vehicle_ahead_dist;
+	float 		vehicle_behind_dist;
+	int 		start_lane;
+	int 		end_lane;
 };
 
 
