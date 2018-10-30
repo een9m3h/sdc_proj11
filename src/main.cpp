@@ -297,9 +297,10 @@ int main() {
 
 		std::cout << "size x/y next in main " << next_x_vals.size() << std::endl;
 
+		/*
 		for(int i = 0; i < next_x_vals.size(); i++){
 			std::cout << "next_x_vals: " << next_x_vals[i] << " next_y_vals: " << next_y_vals[i] << std::endl;			
-		}
+		}*/
 
 
 		//find ref_v to use
