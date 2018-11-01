@@ -7,6 +7,25 @@ You can download the Term3 Simulator which contains the Path Planning Project fr
 ### Goals
 In this project your goal is to safely navigate around a virtual highway with other traffic that is driving +-10 MPH of the 50 MPH speed limit. You will be provided the car's localization and sensor fusion data, there is also a sparse map list of waypoints around the highway. The car should try to go as close as possible to the 50 MPH speed limit, which means passing slower traffic when possible, note that other cars will try to change lanes too. The car should avoid hitting other cars at all cost as well as driving inside of the marked road lanes at all times, unless going from one lane to another. The car should be able to make one complete loop around the 6946m highway. Since the car is trying to go 50 MPH, it should take a little over 5 minutes to complete 1 loop. Also the car should not experience total acceleration over 10 m/s^2 and jerk that is greater than 10 m/s^3.
 
+### Implementation
+
+The implementation tackles 3 issues to achieve the project objectives.
+
+1. Trajectory Generation
+2. Keeping in the lane
+3. Changing lanes
+
+#### Trajectory Generation
+
+The objective of the trajectory generation was to keep the vehicle in the lane or move to a target lane whilst minimizing jerk and meeting the hard requirements: driving +-10 MPH of the 50 MPH speed limit, should not experience total acceleration over 10 m/s^2 and jerk that is greater than 10 m/s^3. To simplify the trajectory generation the concept of a planning period was devised. For that planning period the total distance the car would travel is calculated and points generated along the path. To simplify the algorithm the coordinate system was translated into the heading of the car and then in to frenet coordinates. Then "anchor" points are used for spline interpolation. From this x,y coordinates were then calculated and translated back into the map coordinates.
+
+#### Keeping in the lane
+Using sensor fusion, the position and velocities of nearby cars are known. The objective is to either keep a safe distance from the car in front and maintain lane speed or accelerate to the speed limit. To achieve this the get_kinematic() function calculated three outputs {acceleration, time in acceleration and target velocity at the end of the plan). These outputs where based on 4 use-cases involving relative speed between the ego and car in front and distance to car in front. Trajectory planning then used the 3 output parameters to generate a keep lane trajectory.
+
+#### Changing lanes
+The objective is to change lanes if a faster lane is available. To achieve this up to- 3 trajectories are created based on the current lane, i.e. right lane change, keep lane and left lane change. Each trajectory is then compared against 2 cost functions that assign a cost for relative lane speeds and if the lane change has no vehicles with a certain distance both in front and behind. Lane changes occur when the cost function is lower than the keep lane cost.
+
+
 #### The map of the highway is in data/highway_map.txt
 Each waypoint in the list contains  [x,y,s,dx,dy] values. x and y are the waypoint's map coordinate position, the s value is the distance along the road to get to that waypoint in meters, the dx and dy values define the unit normal vector pointing outward of the highway loop.
 
